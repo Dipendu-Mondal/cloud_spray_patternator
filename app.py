@@ -6,9 +6,9 @@ import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
 from PIL import Image
 
-# ---------------------------------------------------
+# =====================================================
 # PAGE CONFIG
-# ---------------------------------------------------
+# =====================================================
 
 st.set_page_config(
     page_title="Cloud Spray Patternator",
@@ -22,31 +22,44 @@ uploaded = st.file_uploader(
     type=["png", "jpg", "jpeg"]
 )
 
-# ---------------------------------------------------
+# =====================================================
 # MAIN PROCESSING
-# ---------------------------------------------------
+# =====================================================
 
 if uploaded:
 
-    # -----------------------------------------------
+    # =================================================
     # LOAD IMAGE
-    # -----------------------------------------------
+    # =================================================
 
     image = Image.open(uploaded).convert("RGB")
+
     image_np = np.array(image)
 
     st.subheader("Original Image")
-    st.image(image_np, use_container_width=True)
 
-    # -----------------------------------------------
+    st.image(
+        image_np,
+        use_container_width=True
+    )
+
+    # =================================================
     # PREPROCESSING
-    # -----------------------------------------------
+    # =================================================
 
-    gray = cv2.cvtColor(image_np, cv2.COLOR_RGB2GRAY)
+    gray = cv2.cvtColor(
+        image_np,
+        cv2.COLOR_RGB2GRAY
+    )
 
-    blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    blur = cv2.GaussianBlur(
+        gray,
+        (5, 5),
+        0
+    )
 
-    # Adaptive threshold
+    # Adaptive thresholding
+
     thresh = cv2.adaptiveThreshold(
         blur,
         255,
@@ -57,11 +70,16 @@ if uploaded:
     )
 
     # Edge detection
-    edges = cv2.Canny(thresh, 50, 150)
 
-    # -----------------------------------------------
+    edges = cv2.Canny(
+        thresh,
+        50,
+        150
+    )
+
+    # =================================================
     # REMOVE NOZZLE REGION
-    # -----------------------------------------------
+    # =================================================
 
     h, w = edges.shape
 
@@ -69,9 +87,9 @@ if uploaded:
 
     cropped_edges = edges[crop_start:, :]
 
-    # -----------------------------------------------
-    # DETECT SPRAY BOUNDARY LINES
-    # -----------------------------------------------
+    # =================================================
+    # LINE DETECTION
+    # =================================================
 
     lines = cv2.HoughLinesP(
         cropped_edges,
@@ -85,7 +103,12 @@ if uploaded:
     line_image = np.zeros_like(cropped_edges)
 
     left_angles = []
+
     right_angles = []
+
+    # =================================================
+    # DETECT SPRAY BOUNDARY LINES
+    # =================================================
 
     if lines is not None:
 
@@ -93,16 +116,8 @@ if uploaded:
 
             x1, y1, x2, y2 = line[0]
 
-            # Draw line
-            cv2.line(
-                line_image,
-                (x1, y1),
-                (x2, y2),
-                255,
-                2
-            )
+            # Calculate line angle
 
-            # Calculate angle
             angle = np.degrees(
                 np.arctan2(
                     (y2 - y1),
@@ -110,33 +125,53 @@ if uploaded:
                 )
             )
 
-            # Left boundary
-            if angle < -10:
+            # LEFT boundary filter
+
+            if -80 < angle < -10:
+
                 left_angles.append(angle)
 
-            # Right boundary
-            elif angle > 10:
+                cv2.line(
+                    line_image,
+                    (x1, y1),
+                    (x2, y2),
+                    255,
+                    2
+                )
+
+            # RIGHT boundary filter
+
+            elif 10 < angle < 80:
+
                 right_angles.append(angle)
 
-    # -----------------------------------------------
+                cv2.line(
+                    line_image,
+                    (x1, y1),
+                    (x2, y2),
+                    255,
+                    2
+                )
+
+    # =================================================
     # CALCULATE SPRAY ANGLE
-    # -----------------------------------------------
+    # =================================================
 
     spray_angle = None
 
     if left_angles and right_angles:
 
         left_mean = np.mean(left_angles)
+
         right_mean = np.mean(right_angles)
 
-spray_angle = 180 - abs(
-    right_mean - left_mean
-)
+        spray_angle = 180 - abs(
+            right_mean - left_mean
+        )
 
-
-    # -----------------------------------------------
-    # DISPLAY DETECTED REGION
-    # -----------------------------------------------
+    # =================================================
+    # DISPLAY DETECTED BOUNDARIES
+    # =================================================
 
     st.subheader("Detected Spray Boundary")
 
@@ -144,6 +179,10 @@ spray_angle = 180 - abs(
         line_image,
         use_container_width=True
     )
+
+    # =================================================
+    # DISPLAY ANGLE
+    # =================================================
 
     if spray_angle is not None:
 
@@ -158,15 +197,17 @@ spray_angle = 180 - abs(
             "Spray angle could not be detected."
         )
 
-    # -----------------------------------------------
+    # =================================================
     # SPRAY DISTRIBUTION PROFILE
-    # -----------------------------------------------
+    # =================================================
 
     sample_y = int(h * 0.55)
 
     profile = gray[sample_y, :]
 
-    fig, ax = plt.subplots(figsize=(12, 4))
+    fig, ax = plt.subplots(
+        figsize=(12, 4)
+    )
 
     ax.plot(profile)
 
@@ -174,17 +215,21 @@ spray_angle = 180 - abs(
         "Spray Distribution Profile"
     )
 
-    ax.set_xlabel("Pixel Position")
+    ax.set_xlabel(
+        "Pixel Position"
+    )
 
-    ax.set_ylabel("Intensity")
+    ax.set_ylabel(
+        "Intensity"
+    )
 
     ax.grid(True)
 
     st.pyplot(fig)
 
-    # -----------------------------------------------
-    # SOLID STREAM JET DETECTION
-    # -----------------------------------------------
+    # =================================================
+    # PEAK DETECTION
+    # =================================================
 
     peaks, properties = find_peaks(
         profile,
@@ -192,7 +237,9 @@ spray_angle = 180 - abs(
         distance=20
     )
 
-    fig2, ax2 = plt.subplots(figsize=(12, 4))
+    fig2, ax2 = plt.subplots(
+        figsize=(12, 4)
+    )
 
     ax2.plot(profile)
 
@@ -207,9 +254,13 @@ spray_angle = 180 - abs(
         "Solid Stream Jet Detection"
     )
 
-    ax2.set_xlabel("Pixel Position")
+    ax2.set_xlabel(
+        "Pixel Position"
+    )
 
-    ax2.set_ylabel("Intensity")
+    ax2.set_ylabel(
+        "Intensity"
+    )
 
     ax2.grid(True)
 
@@ -220,9 +271,9 @@ spray_angle = 180 - abs(
         len(peaks)
     )
 
-    # -----------------------------------------------
-    # BINARY MASK DISPLAY
-    # -----------------------------------------------
+    # =================================================
+    # SHOW BINARY MASK
+    # =================================================
 
     st.subheader("Binary Spray Mask")
 
@@ -231,12 +282,13 @@ spray_angle = 180 - abs(
         use_container_width=True
     )
 
-# ---------------------------------------------------
+# =====================================================
 # FOOTER
-# ---------------------------------------------------
+# =====================================================
 
 st.markdown("---")
 
 st.markdown(
     "Built using Streamlit + OpenCV + SciPy"
 )
+
