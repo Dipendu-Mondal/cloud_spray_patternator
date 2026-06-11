@@ -129,9 +129,10 @@ if uploaded:
         left_mean = np.mean(left_angles)
         right_mean = np.mean(right_angles)
 
-        spray_angle = abs(
-            right_mean - left_mean
-        )
+spray_angle = 180 - abs(
+    right_mean - left_mean
+)
+
 
     # -----------------------------------------------
     # DISPLAY DETECTED REGION
